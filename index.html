@@ -492,6 +492,43 @@
             transform: rotateX(-90deg) translateZ(30px);
         }
 
+        .show-all-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .show-all-btn {
+            width: 90px;
+            height: 90px;
+            background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(108, 92, 231, 0.4);
+        }
+
+        .show-all-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(108, 92, 231, 0.6);
+            background: linear-gradient(135deg, #5f3dc4, #9775fa);
+        }
+
+        .show-all-btn span {
+            font-size: 0.7rem;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+
         @media (max-width: 768px) {
             .containers-grid {
                 grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
@@ -500,6 +537,12 @@
             .container {
                 width: 70px;
                 height: 70px;
+            }
+            
+            .show-all-btn {
+                width: 70px;
+                height: 70px;
+                font-size: 1rem;
             }
             
             .groups-grid {
@@ -582,11 +625,11 @@
             <label for="csvFile" class="file-input-label">📂 Charger CSV</label>
         </div>
         <button class="btn" id="downloadCsvBtn">💾 Télécharger CSV Exemple</button>
+        <button class="btn" id="generateBtn">🎲 Générer Containers</button>
         <div class="file-status" id="fileStatus">Format attendu: id,v1,v2 (en-têtes obligatoires) - Nombre de containers multiple de 4 recommandé</div>
     </div>
 
     <div class="controls">
-        <button class="btn" id="generateBtn">🎲 Générer Containers</button>
         <button class="btn secondary" id="optimizeBtn">🚀 Optimiser</button>
         <button class="btn" id="resetBtn">🔄 Reset</button>
     </div>
@@ -673,6 +716,7 @@
                 this.toleranceV2 = 1.5;
                 this.fitnessHistory = [];
                 this.numGroups = 16; // Sera calculé dynamiquement
+                this.showAllContainers = false;
                 
                 this.initializeEventListeners();
             }
@@ -684,6 +728,8 @@
                 $('#csvFile').on('change', (e) => this.handleFileUpload(e));
                 $('#downloadCsvBtn').on('click', () => this.downloadExampleCsv());
                 $('#exportGroupsBtn').on('click', () => this.exportGroups());
+                // Utiliser la délégation d'événements pour les boutons créés dynamiquement
+                $(document).on('click', '#showAllBtn', () => this.toggleShowAll());
             }
 
             generateContainers() {
@@ -903,7 +949,11 @@
                 $('#containerCount').text(this.containers.length);
                 $('#groupCount').text(this.numGroups);
 
-                this.containers.forEach((container, index) => {
+                // Déterminer combien de containers afficher
+                const maxDisplay = this.showAllContainers ? this.containers.length : Math.min(4, this.containers.length);
+                const containersToShow = this.containers.slice(0, maxDisplay);
+
+                containersToShow.forEach((container, index) => {
                     const v1Normalized = (container.v1 - 45) / 10;
                     const v2Normalized = (container.v2 - 20) / 10;
                     
@@ -944,6 +994,23 @@
                     
                     grid.append(containerDiv);
                 });
+
+                // Ajouter le bouton "..." si nécessaire
+                if (this.containers.length > 4 && !this.showAllContainers) {
+                    const showAllBtn = $(`
+                        <div class="container fade-in show-all-container">
+                            <button id="showAllBtn" class="show-all-btn">...<br><span>Voir tous<br>(${this.containers.length})</span></button>
+                        </div>
+                    `);
+                    grid.append(showAllBtn);
+                } else if (this.showAllContainers && this.containers.length > 4) {
+                    const hideBtn = $(`
+                        <div class="container fade-in show-all-container">
+                            <button id="showAllBtn" class="show-all-btn">⬆<br><span>Réduire<br>l'affichage</span></button>
+                        </div>
+                    `);
+                    grid.append(hideBtn);
+                }
             }
 
             async startOptimization() {
@@ -1373,6 +1440,14 @@
 
                 $('#groupsSection').show();
                 
+                // Scroll automatique vers la section des groupes optimisés
+                setTimeout(() => {
+                    document.getElementById('groupsSection').scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }, 300);
+                
                 // Mettre à jour les statistiques après affichage
                 $('#containerCount').text(this.containers.length);
                 $('#groupCount').text(this.numGroups);
@@ -1404,10 +1479,16 @@
                 $('#optimizeBtn').prop('disabled', true);
                 $('#generateBtn').show(); // Réafficher le bouton générer lors du reset
                 $('#fileStatus').text('Format attendu: id,v1,v2 (en-têtes obligatoires) - Nombre de containers multiple de 4 recommandé').css('color', 'white');
+                this.showAllContainers = false;
             }
 
             sleep(ms) {
                 return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            toggleShowAll() {
+                this.showAllContainers = !this.showAllContainers;
+                this.displayContainers();
             }
         }
 
