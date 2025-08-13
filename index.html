@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimiseur Génétique de Containers - Dual Variables</title>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .header {
+            text-align: center;
+            padding: 30px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 20px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .objective-section {
+            padding: 20px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.08);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .objective-section h3 {
+            margin-bottom: 15px;
+            color: #ffd700;
+            font-size: 1.3rem;
+        }
+
+        .params-section {
+            padding: 20px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.06);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .params-section h3 {
+            margin-bottom: 15px;
+            color: #ff6b6b;
+            font-size: 1.3rem;
+        }
+
+        .params-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .input-group {
+            display: inline-block;
+            margin: 0 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .input-field {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: white;
+            padding: 10px 15px;
+            font-size: 1rem;
+            width: 120px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: #ffd700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .input-field::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .objective-info {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            opacity: 0.8;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .upload-section {
+            padding: 20px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.07);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .upload-section h3 {
+            margin-bottom: 15px;
+            color: #4CAF50;
+            font-size: 1.3rem;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin: 10px;
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-label {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            border: none;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+            display: inline-block;
+        }
+
+        .file-input-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+        }
+
+        .file-status {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .download-link {
+            color: #4CAF50;
+            text-decoration: underline;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .download-link:hover {
+            color: #45a049;
+        }
+
+        .warning-banner {
+            background: linear-gradient(45deg, #ff4757, #ff3838);
+            color: white;
+            text-align: center;
+            padding: 10px 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 2px 10px rgba(255, 71, 87, 0.3);
+        }
+
+        .container-ids {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            opacity: 0.9;
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .export-section {
+            padding: 30px 20px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.05);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            border: none;
+            color: white;
+            padding: 12px 30px;
+            margin: 10px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+
+        .btn.secondary {
+            background: linear-gradient(45deg, #4834d4, #686de0);
+            box-shadow: 0 4px 15px rgba(72, 52, 212, 0.4);
+        }
+
+        .btn.secondary:hover {
+            box-shadow: 0 6px 20px rgba(72, 52, 212, 0.6);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            min-width: 120px;
+            flex: 1;
+            max-width: 150px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            margin-top: 5px;
+        }
+
+        .containers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+            gap: 10px;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .container {
+            width: 90px;
+            height: 90px;
+            position: relative;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            animation: rotateCube 6s linear infinite;
+            margin: 10px;
+        }
+
+        .cube {
+            position: relative;
+            width: 90px;
+            height: 90px;
+            transform-style: preserve-3d;
+        }
+
+        .cube-face {
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.7rem;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .cube-face.front {
+            transform: translateZ(45px);
+        }
+
+        .cube-face.back {
+            transform: translateZ(-45px) rotateY(180deg);
+        }
+
+        .cube-face.right {
+            transform: rotateY(90deg) translateZ(45px);
+        }
+
+        .cube-face.left {
+            transform: rotateY(-90deg) translateZ(45px);
+        }
+
+        .cube-face.top {
+            transform: rotateX(90deg) translateZ(45px);
+        }
+
+        .cube-face.bottom {
+            transform: rotateX(-90deg) translateZ(45px);
+        }
+
+        .container:hover {
+            animation-play-state: paused;
+            transform: scale(1.1);
+        }
+
+        @keyframes rotateCube {
+            0% {
+                transform: rotateX(0deg) rotateY(0deg);
+            }
+            25% {
+                transform: rotateX(90deg) rotateY(0deg);
+            }
+            50% {
+                transform: rotateX(90deg) rotateY(90deg);
+            }
+            75% {
+                transform: rotateX(0deg) rotateY(90deg);
+            }
+            100% {
+                transform: rotateX(0deg) rotateY(360deg);
+            }
+        }
+
+        .groups-section {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .groups-title {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .groups-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .group {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .group:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .group-header {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .group-containers {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .group-stats {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 0.85rem;
+            opacity: 0.8;
+            line-height: 1.4;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ffd700, #ffed4e);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 3px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #ffd700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .cube-face.small {
+            width: 60px;
+            height: 60px;
+            font-size: 0.65rem;
+        }
+
+        .cube-face.small.front {
+            transform: translateZ(30px);
+        }
+
+        .cube-face.small.back {
+            transform: translateZ(-30px) rotateY(180deg);
+        }
+
+        .cube-face.small.right {
+            transform: rotateY(90deg) translateZ(30px);
+        }
+
+        .cube-face.small.left {
+            transform: rotateY(-90deg) translateZ(30px);
+        }
+
+        .cube-face.small.top {
+            transform: rotateX(90deg) translateZ(30px);
+        }
+
+        .cube-face.small.bottom {
+            transform: rotateX(-90deg) translateZ(30px);
+        }
+
+        @media (max-width: 768px) {
+            .containers-grid {
+                grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+            }
+            
+            .container {
+                width: 70px;
+                height: 70px;
+            }
+            
+            .groups-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .params-grid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="warning-banner">
+        ⚠️ Code expérimental R&D Mediation 2025 - Ne pas utiliser en production ⚠️
+    </div>
+    <div class="header">
+        <h1>🧬 Optimiseur Génétique de Containers - Dual Variables</h1>
+        <p>Algorithme génétique pour l'assemblage optimal de containers en groupes homogènes de 4 avec deux variables V1 et V2</p>
+    </div>
+
+    <div class="objective-section">
+        <h3>🎯 Définir les Objectifs d'Optimisation</h3>
+        <div class="input-group">
+            <label for="targetV1">V1 Cible</label>
+            <input type="number" id="targetV1" class="input-field" value="50.0" step="0.1" min="45" max="55">
+        </div>
+        <div class="input-group">
+            <label for="toleranceV1">Tolérance V1 (±)</label>
+            <input type="number" id="toleranceV1" class="input-field" value="2.0" step="0.1" min="0.1" max="10">
+        </div>
+        <div class="input-group">
+            <label for="targetV2">V2 Cible</label>
+            <input type="number" id="targetV2" class="input-field" value="25.0" step="0.1" min="20" max="30">
+        </div>
+        <div class="input-group">
+            <label for="toleranceV2">Tolérance V2 (±)</label>
+            <input type="number" id="toleranceV2" class="input-field" value="1.5" step="0.1" min="0.1" max="5">
+        </div>
+        <div class="objective-info">
+            💡 L'algorithme optimisera pour créer des groupes avec des moyennes V1 et V2 proches de vos objectifs dans les tolérances spécifiées.
+            V1 et V2 sont additives comme les masses dans l'optimisation.
+        </div>
+    </div>
+
+    <div class="params-section">
+        <h3>⚙️ Paramètres de l'Algorithme Génétique</h3>
+        <div class="params-grid">
+            <div class="input-group">
+                <label for="populationSize">Taille Population</label>
+                <input type="number" id="populationSize" class="input-field" value="150" min="50" max="500">
+            </div>
+            <div class="input-group">
+                <label for="mutationRate">Taux Mutation (%)</label>
+                <input type="number" id="mutationRate" class="input-field" value="15" min="1" max="50">
+            </div>
+            <div class="input-group">
+                <label for="maxGenerations">Max Générations</label>
+                <input type="number" id="maxGenerations" class="input-field" value="300" min="50" max="1000">
+            </div>
+            <div class="input-group">
+                <label for="elitismRate">Taux Élitisme (%)</label>
+                <input type="number" id="elitismRate" class="input-field" value="10" min="1" max="30">
+            </div>
+            <div class="input-group">
+                <label for="tournamentSize">Taille Tournoi</label>
+                <input type="number" id="tournamentSize" class="input-field" value="5" min="2" max="10">
+            </div>
+            <div class="input-group">
+                <label for="crossoverRate">Taux Croisement (%)</label>
+                <input type="number" id="crossoverRate" class="input-field" value="80" min="50" max="100">
+            </div>
+        </div>
+    </div>
+
+    <div class="upload-section">
+        <h3>📄 Import/Export des Données</h3>
+        <div class="file-input-wrapper">
+            <input type="file" id="csvFile" class="file-input" accept=".csv" />
+            <label for="csvFile" class="file-input-label">📂 Charger CSV</label>
+        </div>
+        <button class="btn" id="downloadCsvBtn">💾 Télécharger CSV Exemple</button>
+        <div class="file-status" id="fileStatus">Format attendu: id,v1,v2 (en-têtes obligatoires) - Nombre de containers multiple de 4 recommandé</div>
+    </div>
+
+    <div class="controls">
+        <button class="btn" id="generateBtn">🎲 Générer Containers</button>
+        <button class="btn secondary" id="optimizeBtn">🚀 Optimiser</button>
+        <button class="btn" id="resetBtn">🔄 Reset</button>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-value" id="containerCount">0</div>
+            <div class="stat-label">Containers</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="groupCount">0</div>
+            <div class="stat-label">Groupes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="generationCount">0</div>
+            <div class="stat-label">Génération</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="bestFitness">0.00</div>
+            <div class="stat-label">Meilleur Score</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="avgFitness">0.00</div>
+            <div class="stat-label">Score Moyen</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="objectiveReached">0</div>
+            <div class="stat-label">Groupes V1 OK</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="objectiveReachedV2">0</div>
+            <div class="stat-label">Groupes V2 OK</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="bothObjectives">0</div>
+            <div class="stat-label">Groupes V1+V2 OK</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="convergenceRate">0.00</div>
+            <div class="stat-label">Taux Convergence</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="diversityIndex">0.00</div>
+            <div class="stat-label">Index Diversité</div>
+        </div>
+    </div>
+
+    <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>Optimisation en cours...</div>
+    </div>
+
+    <div class="containers-grid" id="containersGrid"></div>
+
+    <div class="groups-section" id="groupsSection" style="display: none;">
+        <h2 class="groups-title">🎯 Groupes Optimisés</h2>
+        <div class="groups-grid" id="groupsGrid"></div>
+        <div class="export-section">
+            <button class="btn" id="exportGroupsBtn">📊 Exporter les Groupes (CSV)</button>
+        </div>
+    </div>
+
+    <script>
+        class GeneticContainerOptimizerDualVar {
+            constructor() {
+                this.containers = [];
+                this.population = [];
+                this.generation = 0;
+                this.populationSize = 150;
+                this.mutationRate = 0.15;
+                this.maxGenerations = 300;
+                this.elitismRate = 0.10;
+                this.tournamentSize = 5;
+                this.crossoverRate = 0.80;
+                this.bestSolution = null;
+                this.isOptimizing = false;
+                this.targetV1 = 50.0;
+                this.toleranceV1 = 2.0;
+                this.targetV2 = 25.0;
+                this.toleranceV2 = 1.5;
+                this.fitnessHistory = [];
+                this.numGroups = 16; // Sera calculé dynamiquement
+                
+                this.initializeEventListeners();
+            }
+
+            initializeEventListeners() {
+                $('#generateBtn').on('click', () => this.generateContainers());
+                $('#optimizeBtn').on('click', () => this.startOptimization());
+                $('#resetBtn').on('click', () => this.reset());
+                $('#csvFile').on('change', (e) => this.handleFileUpload(e));
+                $('#downloadCsvBtn').on('click', () => this.downloadExampleCsv());
+                $('#exportGroupsBtn').on('click', () => this.exportGroups());
+            }
+
+            generateContainers() {
+                this.containers = [];
+                for (let i = 0; i < 64; i++) {
+                    this.containers.push({
+                        id: i,
+                        v1: Math.round((Math.random() * 10 + 45) * 100) / 100,
+                        v2: Math.round((Math.random() * 10 + 20) * 100) / 100
+                    });
+                }
+                this.updateGroupCount();
+                this.displayContainers();
+                $('#optimizeBtn').prop('disabled', false);
+                $('#generateBtn').show(); // S'assurer que le bouton est visible pour la génération
+                $('#fileStatus').text(`64 containers générés aléatoirement (${this.numGroups} groupes)`).css('color', '#4CAF50');
+            }
+
+            updateGroupCount() {
+                this.numGroups = Math.floor(this.containers.length / 4);
+                if (this.containers.length % 4 !== 0) {
+                    // Si le nombre n'est pas divisible par 4, on ajuste
+                    const remainder = this.containers.length % 4;
+                    console.log(`Attention: ${this.containers.length} containers ne sont pas divisibles par 4. ${remainder} containers seront ignorés.`);
+                }
+            }
+
+            handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                if (!file.name.endsWith('.csv')) {
+                    $('#fileStatus').text('❌ Veuillez sélectionner un fichier CSV').css('color', '#ff6b6b');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const csvData = e.target.result;
+                        this.parseCsv(csvData);
+                    } catch (error) {
+                        $('#fileStatus').text('❌ Erreur lors de la lecture du fichier').css('color', '#ff6b6b');
+                        console.error('Error reading file:', error);
+                    }
+                };
+                reader.readAsText(file);
+            }
+
+            parseCsv(csvData) {
+                const lines = csvData.trim().split('\n');
+                if (lines.length < 2) {
+                    $('#fileStatus').text('❌ Le fichier CSV doit contenir au moins une ligne d\'en-têtes et une ligne de données').css('color', '#ff6b6b');
+                    return;
+                }
+
+                const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
+                const expectedHeaders = ['id', 'v1', 'v2'];
+                
+                // Vérifier les en-têtes
+                const hasAllHeaders = expectedHeaders.every(header => headers.includes(header));
+                if (!hasAllHeaders) {
+                    $('#fileStatus').text('❌ En-têtes manquantes. Format attendu: id,v1,v2').css('color', '#ff6b6b');
+                    return;
+                }
+
+                const idIndex = headers.indexOf('id');
+                const v1Index = headers.indexOf('v1');
+                const v2Index = headers.indexOf('v2');
+
+                const containers = [];
+                const errors = [];
+
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',').map(v => v.trim());
+                    
+                    if (values.length !== headers.length) {
+                        errors.push(`Ligne ${i + 1}: nombre de colonnes incorrect`);
+                        continue;
+                    }
+
+                    const id = parseInt(values[idIndex]);
+                    const v1 = parseFloat(values[v1Index]);
+                    const v2 = parseFloat(values[v2Index]);
+
+                    if (isNaN(id) || isNaN(v1) || isNaN(v2)) {
+                        errors.push(`Ligne ${i + 1}: valeurs numériques invalides`);
+                        continue;
+                    }
+
+                    containers.push({ id, v1, v2 });
+                }
+
+                if (errors.length > 0 && errors.length < 10) {
+                    $('#fileStatus').text(`⚠️ ${errors.length} erreur(s) détectée(s): ${errors.slice(0, 3).join(', ')}`).css('color', '#ff9800');
+                } else if (errors.length >= 10) {
+                    $('#fileStatus').text(`❌ Trop d'erreurs (${errors.length}). Vérifiez le format du fichier`).css('color', '#ff6b6b');
+                    return;
+                }
+
+                if (containers.length === 0) {
+                    $('#fileStatus').text('❌ Aucune donnée valide trouvée').css('color', '#ff6b6b');
+                    return;
+                }
+
+                // Prendre tous les containers
+                this.containers = containers;
+                
+                // Vérifier si le nombre est divisible par 4
+                const remainder = containers.length % 4;
+                if (remainder !== 0) {
+                    // Retirer les containers en trop pour avoir un nombre divisible par 4
+                    this.containers = containers.slice(0, containers.length - remainder);
+                    $('#fileStatus').text(`✅ ${containers.length} containers chargés (${this.containers.length} utilisés, ${remainder} ignorés pour avoir des groupes complets)`).css('color', '#ff9800');
+                } else {
+                    $('#fileStatus').text(`✅ ${containers.length} containers chargés parfaitement`).css('color', '#4CAF50');
+                }
+                
+                this.updateGroupCount();
+
+                // Réassigner les IDs pour être séquentiels
+                this.containers.forEach((container, index) => {
+                    container.id = index;
+                });
+
+                this.displayContainers();
+                $('#optimizeBtn').prop('disabled', false);
+                
+                // Masquer le bouton générer quand un CSV est chargé
+                $('#generateBtn').hide();
+                
+                // Mettre à jour le message de status avec le nombre de groupes
+                const currentStatus = $('#fileStatus').text();
+                if (!currentStatus.includes('groupes')) {
+                    $('#fileStatus').text(currentStatus + ` (${this.numGroups} groupes)`);
+                }
+            }
+
+            downloadExampleCsv() {
+                // Générer un CSV exemple
+                let csvContent = "id,v1,v2\n";
+                for (let i = 1; i <= 200; i++) {
+                    const v1 = Math.round((Math.random() * 10 + 45) * 100) / 100;
+                    const v2 = Math.round((Math.random() * 10 + 20) * 100) / 100;
+                    csvContent += `${i},${v1},${v2}\n`;
+                }
+
+                // Créer et télécharger le fichier
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'containers-example.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                $('#fileStatus').text('📥 Fichier CSV exemple téléchargé').css('color', '#4CAF50');
+            }
+
+            exportGroups() {
+                if (!this.bestSolution || !this.bestSolution.groups) {
+                    alert('Aucune solution à exporter. Veuillez d\'abord lancer l\'optimisation.');
+                    return;
+                }
+
+                // Créer le contenu CSV avec les groupes
+                let csvContent = "groupe_id,container_id,v1,v2,mean_v1,mean_v2,variance_v1,variance_v2,v1_conforme,v2_conforme\n";
+                
+                this.bestSolution.groups.forEach((group, groupIndex) => {
+                    const v1Values = group.map(c => c.v1);
+                    const v2Values = group.map(c => c.v2);
+                    
+                    const meanV1 = v1Values.reduce((sum, val) => sum + val, 0) / 4;
+                    const meanV2 = v2Values.reduce((sum, val) => sum + val, 0) / 4;
+                    
+                    const varianceV1 = v1Values.reduce((sum, val) => sum + Math.pow(val - meanV1, 2), 0) / 4;
+                    const varianceV2 = v2Values.reduce((sum, val) => sum + Math.pow(val - meanV2, 2), 0) / 4;
+                    
+                    const deviationV1 = Math.abs(meanV1 - this.targetV1);
+                    const deviationV2 = Math.abs(meanV2 - this.targetV2);
+                    
+                    const v1Conforming = deviationV1 <= this.toleranceV1;
+                    const v2Conforming = deviationV2 <= this.toleranceV2;
+                    
+                    group.forEach(container => {
+                        csvContent += `${groupIndex + 1},${container.id},${container.v1},${container.v2},${meanV1.toFixed(2)},${meanV2.toFixed(2)},${varianceV1.toFixed(2)},${varianceV2.toFixed(2)},${v1Conforming},${v2Conforming}\n`;
+                    });
+                });
+
+                // Créer et télécharger le fichier
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+                link.setAttribute('href', url);
+                link.setAttribute('download', `groupes-optimises-${timestamp}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Afficher un message de confirmation
+                const originalText = $('#exportGroupsBtn').text();
+                $('#exportGroupsBtn').text('✅ Exporté !').css('background', 'linear-gradient(45deg, #4CAF50, #45a049)');
+                setTimeout(() => {
+                    $('#exportGroupsBtn').text(originalText).css('background', 'linear-gradient(45deg, #ff6b6b, #ee5a24)');
+                }, 2000);
+            }
+
+            displayContainers() {
+                const grid = $('#containersGrid');
+                grid.empty();
+
+                // Mettre à jour les statistiques
+                $('#containerCount').text(this.containers.length);
+                $('#groupCount').text(this.numGroups);
+
+                this.containers.forEach((container, index) => {
+                    const v1Normalized = (container.v1 - 45) / 10;
+                    const v2Normalized = (container.v2 - 20) / 10;
+                    
+                    const hue1 = 240 - (v1Normalized * 120);
+                    const hue2 = 120 - (v2Normalized * 120);
+                    const lightness = 50 + (v1Normalized * 15) + (v2Normalized * 10);
+                    
+                    const containerDiv = $(`
+                        <div class="container fade-in" style="animation-delay: ${Math.random() * 6}s;">
+                            <div class="cube">
+                                <div class="cube-face front" style="background: linear-gradient(135deg, hsl(${hue1}, 70%, ${lightness}%), hsl(${hue2}, 60%, ${lightness - 5}%));">
+                                    <div>V1: ${container.v1}</div>
+                                    <div>V2: ${container.v2}</div>
+                                </div>
+                                <div class="cube-face back" style="background: linear-gradient(135deg, hsl(${hue1}, 60%, ${lightness - 10}%), hsl(${hue2}, 50%, ${lightness - 15}%));">
+                                    <div>V1: ${container.v1}</div>
+                                    <div>V2: ${container.v2}</div>
+                                </div>
+                                <div class="cube-face right" style="background: linear-gradient(135deg, hsl(${hue1}, 65%, ${lightness - 5}%), hsl(${hue2}, 55%, ${lightness - 10}%));">
+                                    <div>V1: ${container.v1}</div>
+                                    <div>V2: ${container.v2}</div>
+                                </div>
+                                <div class="cube-face left" style="background: linear-gradient(135deg, hsl(${hue1}, 65%, ${lightness - 5}%), hsl(${hue2}, 55%, ${lightness - 10}%));">
+                                    <div>V1: ${container.v1}</div>
+                                    <div>V2: ${container.v2}</div>
+                                </div>
+                                <div class="cube-face top" style="background: linear-gradient(135deg, hsl(${hue1}, 75%, ${lightness + 5}%), hsl(${hue2}, 65%, ${lightness}%));">
+                                    <div>V1: ${container.v1}</div>
+                                    <div>V2: ${container.v2}</div>
+                                </div>
+                                <div class="cube-face bottom" style="background: linear-gradient(135deg, hsl(${hue1}, 55%, ${lightness - 15}%), hsl(${hue2}, 45%, ${lightness - 20}%));">
+                                    <div>V1: ${container.v1}</div>
+                                    <div>V2: ${container.v2}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `);
+                    
+                    grid.append(containerDiv);
+                });
+            }
+
+            async startOptimization() {
+                if (this.containers.length === 0) {
+                    alert('Veuillez d\'abord générer les containers!');
+                    return;
+                }
+
+                this.readParameters();
+                
+                if (!this.validateParameters()) {
+                    return;
+                }
+
+                this.isOptimizing = true;
+                $('#optimizeBtn').prop('disabled', true);
+                $('#loading').show();
+                $('#groupsSection').hide();
+
+                this.generation = 0;
+                this.fitnessHistory = [];
+                this.initializePopulation();
+
+                for (let gen = 0; gen < this.maxGenerations && this.isOptimizing; gen++) {
+                    await this.evolveGeneration();
+                    this.updateStats();
+                    this.updateProgress(gen / this.maxGenerations);
+                    
+                    if (gen % 10 === 0) {
+                        await this.sleep(50);
+                    }
+                    
+                    if (this.shouldStop()) {
+                        break;
+                    }
+                }
+
+                this.displayBestSolution();
+                $('#loading').hide();
+                $('#optimizeBtn').prop('disabled', false);
+                this.isOptimizing = false;
+            }
+
+            readParameters() {
+                this.targetV1 = parseFloat($('#targetV1').val());
+                this.toleranceV1 = parseFloat($('#toleranceV1').val());
+                this.targetV2 = parseFloat($('#targetV2').val());
+                this.toleranceV2 = parseFloat($('#toleranceV2').val());
+                this.populationSize = parseInt($('#populationSize').val());
+                this.mutationRate = parseFloat($('#mutationRate').val()) / 100;
+                this.maxGenerations = parseInt($('#maxGenerations').val());
+                this.elitismRate = parseFloat($('#elitismRate').val()) / 100;
+                this.tournamentSize = parseInt($('#tournamentSize').val());
+                this.crossoverRate = parseFloat($('#crossoverRate').val()) / 100;
+            }
+
+            validateParameters() {
+                if (this.targetV1 < 45 || this.targetV1 > 55) {
+                    alert('V1 cible doit être entre 45 et 55!');
+                    return false;
+                }
+                if (this.targetV2 < 20 || this.targetV2 > 30) {
+                    alert('V2 cible doit être entre 20 et 30!');
+                    return false;
+                }
+                if (this.toleranceV1 < 0.1 || this.toleranceV1 > 10) {
+                    alert('Tolérance V1 doit être entre 0.1 et 10!');
+                    return false;
+                }
+                if (this.toleranceV2 < 0.1 || this.toleranceV2 > 5) {
+                    alert('Tolérance V2 doit être entre 0.1 et 5!');
+                    return false;
+                }
+                return true;
+            }
+
+            shouldStop() {
+                if (this.fitnessHistory.length < 50) return false;
+                
+                const recent = this.fitnessHistory.slice(-50);
+                const improvement = recent[recent.length - 1] - recent[0];
+                
+                return improvement < 0.01;
+            }
+
+            initializePopulation() {
+                this.population = [];
+                for (let i = 0; i < this.populationSize; i++) {
+                    const individual = this.createRandomIndividual();
+                    individual.fitness = this.calculateFitness(individual);
+                    this.population.push(individual);
+                }
+                this.population.sort((a, b) => b.fitness - a.fitness);
+                this.bestSolution = { ...this.population[0] };
+            }
+
+            createRandomIndividual() {
+                const groups = [];
+                const containersCopy = [...this.containers];
+                
+                for (let i = 0; i < this.numGroups; i++) {
+                    const group = [];
+                    for (let j = 0; j < 4; j++) {
+                        const randomIndex = Math.floor(Math.random() * containersCopy.length);
+                        group.push(containersCopy.splice(randomIndex, 1)[0]);
+                    }
+                    groups.push(group);
+                }
+                
+                return { groups };
+            }
+
+            calculateFitness(individual) {
+                let totalScore = 0;
+                let conformingV1Groups = 0;
+                let conformingV2Groups = 0;
+                let bothConformingGroups = 0;
+                const penalties = [];
+
+                individual.groups.forEach(group => {
+                    const v1Values = group.map(c => c.v1);
+                    const v2Values = group.map(c => c.v2);
+                    
+                    const meanV1 = v1Values.reduce((sum, val) => sum + val, 0) / 4;
+                    const meanV2 = v2Values.reduce((sum, val) => sum + val, 0) / 4;
+                    
+                    const varianceV1 = v1Values.reduce((sum, val) => sum + Math.pow(val - meanV1, 2), 0) / 4;
+                    const varianceV2 = v2Values.reduce((sum, val) => sum + Math.pow(val - meanV2, 2), 0) / 4;
+                    
+                    const deviationV1 = Math.abs(meanV1 - this.targetV1);
+                    const deviationV2 = Math.abs(meanV2 - this.targetV2);
+                    
+                    const v1Conforming = deviationV1 <= this.toleranceV1;
+                    const v2Conforming = deviationV2 <= this.toleranceV2;
+                    
+                    if (v1Conforming) conformingV1Groups++;
+                    if (v2Conforming) conformingV2Groups++;
+                    if (v1Conforming && v2Conforming) bothConformingGroups++;
+                    
+                    let groupScore = 0;
+                    
+                    if (v1Conforming && v2Conforming) {
+                        groupScore = 200 - (deviationV1 / this.toleranceV1) * 30 - (deviationV2 / this.toleranceV2) * 30 
+                                   - varianceV1 * 2 - varianceV2 * 2;
+                    } else if (v1Conforming) {
+                        groupScore = 100 - (deviationV1 / this.toleranceV1) * 25 - deviationV2 * 3 
+                                   - varianceV1 * 2 - varianceV2 * 2;
+                    } else if (v2Conforming) {
+                        groupScore = 100 - (deviationV2 / this.toleranceV2) * 25 - deviationV1 * 3 
+                                   - varianceV1 * 2 - varianceV2 * 2;
+                    } else {
+                        groupScore = Math.max(0, 50 - deviationV1 * 3 - deviationV2 * 3 
+                                           - varianceV1 * 2 - varianceV2 * 2);
+                    }
+                    
+                    penalties.push(varianceV1 + varianceV2 + deviationV1 + deviationV2);
+                    totalScore += groupScore;
+                });
+
+                const avgPenalty = penalties.reduce((sum, p) => sum + p, 0) / this.numGroups;
+                const bonusForConforming = bothConformingGroups * 50 + conformingV1Groups * 15 + conformingV2Groups * 15;
+                
+                individual.conformingV1Groups = conformingV1Groups;
+                individual.conformingV2Groups = conformingV2Groups;
+                individual.bothConformingGroups = bothConformingGroups;
+                
+                return totalScore + bonusForConforming - avgPenalty;
+            }
+
+            async evolveGeneration() {
+                const newPopulation = [];
+                const eliteSize = Math.floor(this.populationSize * this.elitismRate);
+                
+                for (let i = 0; i < eliteSize; i++) {
+                    newPopulation.push({ ...this.population[i] });
+                }
+
+                while (newPopulation.length < this.populationSize) {
+                    const parent1 = this.selectParent();
+                    const parent2 = this.selectParent();
+                    
+                    let child;
+                    if (Math.random() < this.crossoverRate) {
+                        child = this.crossover(parent1, parent2);
+                    } else {
+                        child = { ...parent1 };
+                    }
+                    
+                    if (Math.random() < this.mutationRate) {
+                        this.mutate(child);
+                    }
+                    
+                    child.fitness = this.calculateFitness(child);
+                    newPopulation.push(child);
+                }
+
+                this.population = newPopulation;
+                this.population.sort((a, b) => b.fitness - a.fitness);
+                
+                if (this.population[0].fitness > this.bestSolution.fitness) {
+                    this.bestSolution = { ...this.population[0] };
+                }
+                
+                this.fitnessHistory.push(this.population[0].fitness);
+                this.generation++;
+            }
+
+            selectParent() {
+                const tournament = [];
+                
+                for (let i = 0; i < this.tournamentSize; i++) {
+                    const randomIndex = Math.floor(Math.random() * this.population.length);
+                    tournament.push(this.population[randomIndex]);
+                }
+                
+                tournament.sort((a, b) => b.fitness - a.fitness);
+                return tournament[0];
+            }
+
+            crossover(parent1, parent2) {
+                const allContainers = [];
+                parent1.groups.forEach(group => allContainers.push(...group));
+                
+                const child = { groups: [] };
+                const usedContainers = new Set();
+                
+                const crossoverPoint = Math.floor(Math.random() * this.numGroups);
+                
+                for (let i = 0; i < crossoverPoint; i++) {
+                    const group = [];
+                    parent1.groups[i].forEach(container => {
+                        if (!usedContainers.has(container.id)) {
+                            group.push(container);
+                            usedContainers.add(container.id);
+                        }
+                    });
+                    if (group.length === 4) {
+                        child.groups.push(group);
+                    }
+                }
+                
+                const remainingContainers = allContainers.filter(c => !usedContainers.has(c.id));
+                
+                while (child.groups.length < this.numGroups && remainingContainers.length >= 4) {
+                    const group = [];
+                    for (let i = 0; i < 4; i++) {
+                        const randomIndex = Math.floor(Math.random() * remainingContainers.length);
+                        group.push(remainingContainers.splice(randomIndex, 1)[0]);
+                    }
+                    child.groups.push(group);
+                }
+                
+                while (child.groups.length < this.numGroups) {
+                    child.groups.push(this.createRandomIndividual().groups[0]);
+                }
+                
+                return child;
+            }
+
+            mutate(individual) {
+                const mutationType = Math.random();
+                
+                if (mutationType < 0.6) {
+                    const group1Index = Math.floor(Math.random() * this.numGroups);
+                    const group2Index = Math.floor(Math.random() * this.numGroups);
+                    
+                    if (group1Index !== group2Index) {
+                        const container1Index = Math.floor(Math.random() * 4);
+                        const container2Index = Math.floor(Math.random() * 4);
+                        
+                        const temp = individual.groups[group1Index][container1Index];
+                        individual.groups[group1Index][container1Index] = individual.groups[group2Index][container2Index];
+                        individual.groups[group2Index][container2Index] = temp;
+                    }
+                } else if (mutationType < 0.9) {
+                    const groupIndex = Math.floor(Math.random() * this.numGroups);
+                    const group = individual.groups[groupIndex];
+                    
+                    for (let i = group.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [group[i], group[j]] = [group[j], group[i]];
+                    }
+                } else {
+                    const group1Index = Math.floor(Math.random() * this.numGroups);
+                    const group2Index = Math.floor(Math.random() * this.numGroups);
+                    
+                    if (group1Index !== group2Index) {
+                        [individual.groups[group1Index], individual.groups[group2Index]] = 
+                        [individual.groups[group2Index], individual.groups[group1Index]];
+                    }
+                }
+            }
+
+            calculateDiversityIndex() {
+                if (this.population.length === 0) return 0;
+                
+                const fitnessValues = this.population.map(ind => ind.fitness);
+                const mean = fitnessValues.reduce((sum, val) => sum + val, 0) / fitnessValues.length;
+                const variance = fitnessValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / fitnessValues.length;
+                
+                return Math.sqrt(variance) / mean;
+            }
+
+            calculateConvergenceRate() {
+                if (this.fitnessHistory.length < 20) return 0;
+                
+                const recent = this.fitnessHistory.slice(-20);
+                const improvement = recent[recent.length - 1] - recent[0];
+                
+                return Math.max(0, improvement);
+            }
+
+            updateStats() {
+                const avgFitness = this.population.reduce((sum, ind) => sum + ind.fitness, 0) / this.populationSize;
+                const diversityIndex = this.calculateDiversityIndex();
+                const convergenceRate = this.calculateConvergenceRate();
+                
+                $('#containerCount').text(this.containers.length);
+                $('#groupCount').text(this.numGroups);
+                $('#generationCount').text(this.generation);
+                $('#bestFitness').text(Math.round(this.bestSolution.fitness));
+                $('#avgFitness').text(Math.round(avgFitness));
+                $('#objectiveReached').text(this.bestSolution.conformingV1Groups || 0);
+                $('#objectiveReachedV2').text(this.bestSolution.conformingV2Groups || 0);
+                $('#bothObjectives').text(this.bestSolution.bothConformingGroups || 0);
+                $('#convergenceRate').text(convergenceRate.toFixed(2));
+                $('#diversityIndex').text(diversityIndex.toFixed(2));
+            }
+
+            updateProgress(progress) {
+                $('#progressFill').css('width', `${progress * 100}%`);
+            }
+
+            displayBestSolution() {
+                const groupsGrid = $('#groupsGrid');
+                groupsGrid.empty();
+
+                this.bestSolution.groups.forEach((group, groupIndex) => {
+                    const v1Values = group.map(c => c.v1);
+                    const v2Values = group.map(c => c.v2);
+                    
+                    const meanV1 = v1Values.reduce((sum, val) => sum + val, 0) / 4;
+                    const meanV2 = v2Values.reduce((sum, val) => sum + val, 0) / 4;
+                    
+                    const varianceV1 = v1Values.reduce((sum, val) => sum + Math.pow(val - meanV1, 2), 0) / 4;
+                    const varianceV2 = v2Values.reduce((sum, val) => sum + Math.pow(val - meanV2, 2), 0) / 4;
+                    
+                    const deviationV1 = Math.abs(meanV1 - this.targetV1);
+                    const deviationV2 = Math.abs(meanV2 - this.targetV2);
+                    
+                    const v1Conforming = deviationV1 <= this.toleranceV1;
+                    const v2Conforming = deviationV2 <= this.toleranceV2;
+                    
+                    const containerIds = group.map(c => c.id).sort((a, b) => a - b).join(', ');
+                    
+                    const groupDiv = $(`
+                        <div class="group fade-in" style="animation-delay: ${groupIndex * 100}ms;">
+                            <div class="group-header">Groupe ${groupIndex + 1}</div>
+                            <div class="container-ids">IDs: [${containerIds}]</div>
+                            <div class="group-containers"></div>
+                            <div class="group-stats">
+                                <div><strong>V1:</strong> Moy. ${meanV1.toFixed(2)} | Var. ${varianceV1.toFixed(2)}</div>
+                                <div><strong>V2:</strong> Moy. ${meanV2.toFixed(2)} | Var. ${varianceV2.toFixed(2)}</div>
+                                ${v1Conforming ? 
+                                    '<div style="color: #4CAF50; font-weight: bold;">✅ V1 Conforme</div>' : 
+                                    `<div style="color: #ff6b6b; font-weight: bold;">❌ V1 Écart: ${deviationV1.toFixed(2)}</div>`
+                                }
+                                ${v2Conforming ? 
+                                    '<div style="color: #4CAF50; font-weight: bold;">✅ V2 Conforme</div>' : 
+                                    `<div style="color: #ff6b6b; font-weight: bold;">❌ V2 Écart: ${deviationV2.toFixed(2)}</div>`
+                                }
+                            </div>
+                        </div>
+                    `);
+
+                    const containersDiv = groupDiv.find('.group-containers');
+                    group.forEach((container, containerIndex) => {
+                        const v1Normalized = (container.v1 - 45) / 10;
+                        const v2Normalized = (container.v2 - 20) / 10;
+                        
+                        const hue1 = 240 - (v1Normalized * 120);
+                        const hue2 = 120 - (v2Normalized * 120);
+                        const lightness = 50 + (v1Normalized * 15) + (v2Normalized * 10);
+                        
+                        const animationDelay = (groupIndex * 0.8) % 6;
+                        
+                        const containerDiv = $(`
+                            <div class="container" style="
+                                width: 60px;
+                                height: 60px;
+                                animation-delay: ${animationDelay}s;
+                            ">
+                                <div class="cube" style="width: 60px; height: 60px;">
+                                    <div class="cube-face small front" style="background: linear-gradient(135deg, hsl(${hue1}, 70%, ${lightness}%), hsl(${hue2}, 60%, ${lightness - 5}%));">
+                                        <div>V1: ${container.v1}</div>
+                                        <div>V2: ${container.v2}</div>
+                                    </div>
+                                    <div class="cube-face small back" style="background: linear-gradient(135deg, hsl(${hue1}, 60%, ${lightness - 10}%), hsl(${hue2}, 50%, ${lightness - 15}%));">
+                                        <div>V1: ${container.v1}</div>
+                                        <div>V2: ${container.v2}</div>
+                                    </div>
+                                    <div class="cube-face small right" style="background: linear-gradient(135deg, hsl(${hue1}, 65%, ${lightness - 5}%), hsl(${hue2}, 55%, ${lightness - 10}%));">
+                                        <div>V1: ${container.v1}</div>
+                                        <div>V2: ${container.v2}</div>
+                                    </div>
+                                    <div class="cube-face small left" style="background: linear-gradient(135deg, hsl(${hue1}, 65%, ${lightness - 5}%), hsl(${hue2}, 55%, ${lightness - 10}%));">
+                                        <div>V1: ${container.v1}</div>
+                                        <div>V2: ${container.v2}</div>
+                                    </div>
+                                    <div class="cube-face small top" style="background: linear-gradient(135deg, hsl(${hue1}, 75%, ${lightness + 5}%), hsl(${hue2}, 65%, ${lightness}%));">
+                                        <div>V1: ${container.v1}</div>
+                                        <div>V2: ${container.v2}</div>
+                                    </div>
+                                    <div class="cube-face small bottom" style="background: linear-gradient(135deg, hsl(${hue1}, 55%, ${lightness - 15}%), hsl(${hue2}, 45%, ${lightness - 20}%));">
+                                        <div>V1: ${container.v1}</div>
+                                        <div>V2: ${container.v2}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `);
+                        
+                        containersDiv.append(containerDiv);
+                    });
+
+                    groupsGrid.append(groupDiv);
+                });
+
+                $('#groupsSection').show();
+                
+                // Mettre à jour les statistiques après affichage
+                $('#containerCount').text(this.containers.length);
+                $('#groupCount').text(this.numGroups);
+            }
+
+            reset() {
+                this.containers = [];
+                this.population = [];
+                this.generation = 0;
+                this.bestSolution = null;
+                this.isOptimizing = false;
+                this.fitnessHistory = [];
+
+                $('#containersGrid').empty();
+                $('#groupsGrid').empty();
+                $('#groupsSection').hide();
+                $('#loading').hide();
+                $('#progressFill').css('width', '0%');
+                $('#containerCount').text('0');
+                $('#groupCount').text('0');
+                $('#generationCount').text('0');
+                $('#bestFitness').text('0');
+                $('#avgFitness').text('0');
+                $('#objectiveReached').text('0');
+                $('#objectiveReachedV2').text('0');
+                $('#bothObjectives').text('0');
+                $('#convergenceRate').text('0.00');
+                $('#diversityIndex').text('0.00');
+                $('#optimizeBtn').prop('disabled', true);
+                $('#generateBtn').show(); // Réafficher le bouton générer lors du reset
+                $('#fileStatus').text('Format attendu: id,v1,v2 (en-têtes obligatoires) - Nombre de containers multiple de 4 recommandé').css('color', 'white');
+            }
+
+            sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        $(document).ready(() => {
+            new GeneticContainerOptimizerDualVar();
+        });
+    </script>
+</body>
+</html>
