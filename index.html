@@ -590,6 +590,9 @@
             💡 L'algorithme optimisera pour créer des groupes avec des moyennes V1 et V2 proches de vos objectifs dans les tolérances spécifiées.
             V1 et V2 sont additives comme les masses dans l'optimisation.
         </div>
+        <div style="text-align: center; margin-top: 15px;">
+            <button class="btn secondary" id="resetToDefaultsBtn">🔄 Valeurs par Défaut</button>
+        </div>
     </div>
 
     <div class="params-section">
@@ -627,10 +630,6 @@
         <div class="file-input-wrapper">
             <input type="file" id="csvFile" class="file-input" accept=".csv" />
             <label for="csvFile" class="file-input-label">📂 Charger CSV</label>
-        </div>
-        <div class="input-group" style="margin: 10px 0;">
-            <label for="maxRows">Max Lignes à Charger</label>
-            <input type="number" id="maxRows" class="input-field" value="200" step="1" min="10" max="10000">
         </div>
         <button class="btn" id="downloadCsvBtn">💾 Télécharger CSV Exemple</button>
         <button class="btn" id="generateBtn">🎲 Générer Containers</button>
@@ -698,6 +697,11 @@
 
     <div class="groups-section" id="groupsSection" style="display: none;">
         <h2 class="groups-title">🎯 Groupes Optimisés</h2>
+        <div class="pagination-controls" id="paginationControls" style="display: none; text-align: center; margin-bottom: 20px;">
+            <button class="btn secondary" id="prevPageBtn">⬅ Précédent</button>
+            <span id="pageInfo" style="margin: 0 20px; color: white; font-weight: bold;">Page 1 sur 1</span>
+            <button class="btn secondary" id="nextPageBtn">Suivant ➡</button>
+        </div>
         <div class="groups-grid" id="groupsGrid"></div>
         <div class="export-section">
             <button class="btn" id="exportGroupsBtn">📊 Exporter les Groupes (CSV)</button>
@@ -726,8 +730,11 @@
                 this.numGroups = 16; // Sera calculé dynamiquement
                 this.containersPerGroup = 4;
                 this.showAllContainers = false;
+                this.currentPage = 0;
+                this.groupsPerPage = 8;
                 
                 this.initializeEventListeners();
+                this.loadSettings();
             }
 
             initializeEventListeners() {
@@ -739,6 +746,15 @@
                 $('#exportGroupsBtn').on('click', () => this.exportGroups());
                 // Utiliser la délégation d'événements pour les boutons créés dynamiquement
                 $(document).on('click', '#showAllBtn', () => this.toggleShowAll());
+                $('#prevPageBtn').on('click', () => this.previousPage());
+                $('#nextPageBtn').on('click', () => this.nextPage());
+                
+                // Sauvegarder les paramètres à chaque modification
+                $('#targetV1, #toleranceV1, #targetV2, #toleranceV2, #containersPerGroup').on('input change', () => this.saveSettings());
+                $('#populationSize, #mutationRate, #maxGenerations, #elitismRate, #tournamentSize, #crossoverRate').on('input change', () => this.saveSettings());
+                
+                // Bouton pour restaurer les valeurs par défaut
+                $('#resetToDefaultsBtn').on('click', () => this.resetToDefaults());
             }
 
             generateContainers() {
@@ -813,10 +829,8 @@
 
                 const containers = [];
                 const errors = [];
-                const maxRows = parseInt($('#maxRows').val()) || 200;
-                const maxLines = Math.min(lines.length, maxRows + 1); // +1 pour inclure les en-têtes
 
-                for (let i = 1; i < maxLines; i++) {
+                for (let i = 1; i < lines.length; i++) {
                     const values = lines[i].split(',').map(v => v.trim());
                     
                     if (values.length !== headers.length) {
@@ -856,13 +870,9 @@
                 if (remainder !== 0) {
                     // Retirer les containers en trop pour avoir un nombre divisible par containersPerGroup
                     this.containers = containers.slice(0, containers.length - remainder);
-                    const totalInFile = lines.length - 1; // -1 pour exclure l'en-tête
-                    const loadedMsg = containers.length < totalInFile ? ` (${containers.length}/${totalInFile} chargés selon limite)` : '';
-                    $('#fileStatus').text(`✅ ${containers.length} containers${loadedMsg} (${this.containers.length} utilisés, ${remainder} ignorés pour groupes complets)`).css('color', '#ff9800');
+                    $('#fileStatus').text(`✅ ${containers.length} containers chargés (${this.containers.length} utilisés, ${remainder} ignorés pour groupes complets)`).css('color', '#ff9800');
                 } else {
-                    const totalInFile = lines.length - 1; // -1 pour exclure l'en-tête
-                    const loadedMsg = containers.length < totalInFile ? ` (${containers.length}/${totalInFile} chargés selon limite)` : '';
-                    $('#fileStatus').text(`✅ ${containers.length} containers${loadedMsg} chargés parfaitement`).css('color', '#4CAF50');
+                    $('#fileStatus').text(`✅ ${containers.length} containers chargés parfaitement`).css('color', '#4CAF50');
                 }
                 
                 this.updateGroupCount();
@@ -1366,7 +1376,16 @@
                 const groupsGrid = $('#groupsGrid');
                 groupsGrid.empty();
 
-                this.bestSolution.groups.forEach((group, groupIndex) => {
+                // Calculer la pagination
+                const startIndex = this.currentPage * this.groupsPerPage;
+                const endIndex = Math.min(startIndex + this.groupsPerPage, this.bestSolution.groups.length);
+                const groupsToShow = this.bestSolution.groups.slice(startIndex, endIndex);
+
+                // Mettre à jour les contrôles de pagination
+                this.updatePaginationControls();
+
+                groupsToShow.forEach((group, relativeIndex) => {
+                    const groupIndex = startIndex + relativeIndex; // Index réel du groupe
                     const v1Values = group.map(c => c.v1);
                     const v2Values = group.map(c => c.v2);
                     
@@ -1487,6 +1506,7 @@
                 this.bestSolution = null;
                 this.isOptimizing = false;
                 this.fitnessHistory = [];
+                this.currentPage = 0;
 
                 $('#containersGrid').empty();
                 $('#groupsGrid').empty();
@@ -1516,6 +1536,113 @@
             toggleShowAll() {
                 this.showAllContainers = !this.showAllContainers;
                 this.displayContainers();
+            }
+
+            previousPage() {
+                if (this.currentPage > 0) {
+                    this.currentPage--;
+                    this.displayBestSolution();
+                }
+            }
+
+            nextPage() {
+                const totalPages = Math.ceil(this.bestSolution.groups.length / this.groupsPerPage);
+                if (this.currentPage < totalPages - 1) {
+                    this.currentPage++;
+                    this.displayBestSolution();
+                }
+            }
+
+            updatePaginationControls() {
+                const totalGroups = this.bestSolution.groups.length;
+                const totalPages = Math.ceil(totalGroups / this.groupsPerPage);
+                
+                if (totalGroups > this.groupsPerPage) {
+                    $('#paginationControls').show();
+                    $('#pageInfo').text(`Page ${this.currentPage + 1} sur ${totalPages} (${totalGroups} groupes)`);
+                    $('#prevPageBtn').prop('disabled', this.currentPage === 0);
+                    $('#nextPageBtn').prop('disabled', this.currentPage >= totalPages - 1);
+                } else {
+                    $('#paginationControls').hide();
+                }
+            }
+
+            saveSettings() {
+                const settings = {
+                    // Paramètres d'optimisation
+                    targetV1: $('#targetV1').val(),
+                    toleranceV1: $('#toleranceV1').val(),
+                    targetV2: $('#targetV2').val(),
+                    toleranceV2: $('#toleranceV2').val(),
+                    containersPerGroup: $('#containersPerGroup').val(),
+                    
+                    // Paramètres de l'algorithme génétique
+                    populationSize: $('#populationSize').val(),
+                    mutationRate: $('#mutationRate').val(),
+                    maxGenerations: $('#maxGenerations').val(),
+                    elitismRate: $('#elitismRate').val(),
+                    tournamentSize: $('#tournamentSize').val(),
+                    crossoverRate: $('#crossoverRate').val()
+                };
+                
+                try {
+                    localStorage.setItem('containerOptimizerSettings', JSON.stringify(settings));
+                } catch (error) {
+                    console.warn('Erreur lors de la sauvegarde des paramètres:', error);
+                }
+            }
+
+            loadSettings() {
+                try {
+                    const savedSettings = localStorage.getItem('containerOptimizerSettings');
+                    if (savedSettings) {
+                        const settings = JSON.parse(savedSettings);
+                        
+                        // Charger les paramètres d'optimisation
+                        if (settings.targetV1) $('#targetV1').val(settings.targetV1);
+                        if (settings.toleranceV1) $('#toleranceV1').val(settings.toleranceV1);
+                        if (settings.targetV2) $('#targetV2').val(settings.targetV2);
+                        if (settings.toleranceV2) $('#toleranceV2').val(settings.toleranceV2);
+                        if (settings.containersPerGroup) $('#containersPerGroup').val(settings.containersPerGroup);
+                        
+                        // Charger les paramètres de l'algorithme génétique
+                        if (settings.populationSize) $('#populationSize').val(settings.populationSize);
+                        if (settings.mutationRate) $('#mutationRate').val(settings.mutationRate);
+                        if (settings.maxGenerations) $('#maxGenerations').val(settings.maxGenerations);
+                        if (settings.elitismRate) $('#elitismRate').val(settings.elitismRate);
+                        if (settings.tournamentSize) $('#tournamentSize').val(settings.tournamentSize);
+                        if (settings.crossoverRate) $('#crossoverRate').val(settings.crossoverRate);
+                    }
+                } catch (error) {
+                    console.warn('Erreur lors du chargement des paramètres:', error);
+                }
+            }
+
+            resetToDefaults() {
+                // Valeurs par défaut pour les objectifs d'optimisation
+                $('#targetV1').val('50.0');
+                $('#toleranceV1').val('2.0');
+                $('#targetV2').val('25.0');
+                $('#toleranceV2').val('1.5');
+                $('#containersPerGroup').val('4');
+                
+                // Valeurs par défaut pour l'algorithme génétique
+                $('#populationSize').val('150');
+                $('#mutationRate').val('15');
+                $('#maxGenerations').val('300');
+                $('#elitismRate').val('10');
+                $('#tournamentSize').val('5');
+                $('#crossoverRate').val('80');
+                
+                // Sauvegarder les nouvelles valeurs
+                this.saveSettings();
+                
+                // Feedback visuel
+                const originalText = $('#resetToDefaultsBtn').text();
+                $('#resetToDefaultsBtn').text('✅ Restauré !').css('background', 'linear-gradient(45deg, #4CAF50, #45a049)');
+                setTimeout(() => {
+                    $('#resetToDefaultsBtn').text(originalText).css('background', 'linear-gradient(45deg, #4834d4, #686de0)');
+                }, 2000);
             }
         }
 
