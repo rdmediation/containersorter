@@ -582,6 +582,10 @@
             <label for="toleranceV2">Tolérance V2 (±)</label>
             <input type="number" id="toleranceV2" class="input-field" value="1.5" step="0.1" min="0.1" max="5">
         </div>
+        <div class="input-group">
+            <label for="containersPerGroup">Containers par Groupe</label>
+            <input type="number" id="containersPerGroup" class="input-field" value="4" step="1" min="2" max="10">
+        </div>
         <div class="objective-info">
             💡 L'algorithme optimisera pour créer des groupes avec des moyennes V1 et V2 proches de vos objectifs dans les tolérances spécifiées.
             V1 et V2 sont additives comme les masses dans l'optimisation.
@@ -626,7 +630,7 @@
         </div>
         <button class="btn" id="downloadCsvBtn">💾 Télécharger CSV Exemple</button>
         <button class="btn" id="generateBtn">🎲 Générer Containers</button>
-        <div class="file-status" id="fileStatus">Format attendu: id,v1,v2 (en-têtes obligatoires) - Nombre de containers multiple de 4 recommandé</div>
+        <div class="file-status" id="fileStatus">Format attendu: id,v1,v2 (en-têtes obligatoires) - Nombre de containers multiple du nombre choisi par groupe recommandé</div>
     </div>
 
     <div class="controls">
@@ -716,6 +720,7 @@
                 this.toleranceV2 = 1.5;
                 this.fitnessHistory = [];
                 this.numGroups = 16; // Sera calculé dynamiquement
+                this.containersPerGroup = 4;
                 this.showAllContainers = false;
                 
                 this.initializeEventListeners();
@@ -733,8 +738,10 @@
             }
 
             generateContainers() {
+                this.readParameters(); // Lire le nombre de containers par groupe
+                const baseCount = this.containersPerGroup * 16; // 16 groupes par défaut
                 this.containers = [];
-                for (let i = 0; i < 64; i++) {
+                for (let i = 0; i < baseCount; i++) {
                     this.containers.push({
                         id: i,
                         v1: Math.round((Math.random() * 10 + 45) * 100) / 100,
@@ -745,15 +752,15 @@
                 this.displayContainers();
                 $('#optimizeBtn').prop('disabled', false);
                 $('#generateBtn').show(); // S'assurer que le bouton est visible pour la génération
-                $('#fileStatus').text(`64 containers générés aléatoirement (${this.numGroups} groupes)`).css('color', '#4CAF50');
+                $('#fileStatus').text(`${baseCount} containers générés aléatoirement (${this.numGroups} groupes de ${this.containersPerGroup})`).css('color', '#4CAF50');
             }
 
             updateGroupCount() {
-                this.numGroups = Math.floor(this.containers.length / 4);
-                if (this.containers.length % 4 !== 0) {
-                    // Si le nombre n'est pas divisible par 4, on ajuste
-                    const remainder = this.containers.length % 4;
-                    console.log(`Attention: ${this.containers.length} containers ne sont pas divisibles par 4. ${remainder} containers seront ignorés.`);
+                this.numGroups = Math.floor(this.containers.length / this.containersPerGroup);
+                if (this.containers.length % this.containersPerGroup !== 0) {
+                    // Si le nombre n'est pas divisible par containersPerGroup, on ajuste
+                    const remainder = this.containers.length % this.containersPerGroup;
+                    console.log(`Attention: ${this.containers.length} containers ne sont pas divisibles par ${this.containersPerGroup}. ${remainder} containers seront ignorés.`);
                 }
             }
 
@@ -838,10 +845,10 @@
                 // Prendre tous les containers
                 this.containers = containers;
                 
-                // Vérifier si le nombre est divisible par 4
-                const remainder = containers.length % 4;
+                // Vérifier si le nombre est divisible par containersPerGroup
+                const remainder = containers.length % this.containersPerGroup;
                 if (remainder !== 0) {
-                    // Retirer les containers en trop pour avoir un nombre divisible par 4
+                    // Retirer les containers en trop pour avoir un nombre divisible par containersPerGroup
                     this.containers = containers.slice(0, containers.length - remainder);
                     $('#fileStatus').text(`✅ ${containers.length} containers chargés (${this.containers.length} utilisés, ${remainder} ignorés pour avoir des groupes complets)`).css('color', '#ff9800');
                 } else {
@@ -904,11 +911,11 @@
                     const v1Values = group.map(c => c.v1);
                     const v2Values = group.map(c => c.v2);
                     
-                    const meanV1 = v1Values.reduce((sum, val) => sum + val, 0) / 4;
-                    const meanV2 = v2Values.reduce((sum, val) => sum + val, 0) / 4;
+                    const meanV1 = v1Values.reduce((sum, val) => sum + val, 0) / this.containersPerGroup;
+                    const meanV2 = v2Values.reduce((sum, val) => sum + val, 0) / this.containersPerGroup;
                     
-                    const varianceV1 = v1Values.reduce((sum, val) => sum + Math.pow(val - meanV1, 2), 0) / 4;
-                    const varianceV2 = v2Values.reduce((sum, val) => sum + Math.pow(val - meanV2, 2), 0) / 4;
+                    const varianceV1 = v1Values.reduce((sum, val) => sum + Math.pow(val - meanV1, 2), 0) / this.containersPerGroup;
+                    const varianceV2 = v2Values.reduce((sum, val) => sum + Math.pow(val - meanV2, 2), 0) / this.containersPerGroup;
                     
                     const deviationV1 = Math.abs(meanV1 - this.targetV1);
                     const deviationV2 = Math.abs(meanV2 - this.targetV2);
@@ -1059,6 +1066,7 @@
                 this.toleranceV1 = parseFloat($('#toleranceV1').val());
                 this.targetV2 = parseFloat($('#targetV2').val());
                 this.toleranceV2 = parseFloat($('#toleranceV2').val());
+                this.containersPerGroup = parseInt($('#containersPerGroup').val());
                 this.populationSize = parseInt($('#populationSize').val());
                 this.mutationRate = parseFloat($('#mutationRate').val()) / 100;
                 this.maxGenerations = parseInt($('#maxGenerations').val());
@@ -1105,7 +1113,7 @@
                 
                 for (let i = 0; i < this.numGroups; i++) {
                     const group = [];
-                    for (let j = 0; j < 4; j++) {
+                    for (let j = 0; j < this.containersPerGroup; j++) {
                         const randomIndex = Math.floor(Math.random() * containersCopy.length);
                         group.push(containersCopy.splice(randomIndex, 1)[0]);
                     }
@@ -1126,11 +1134,11 @@
                     const v1Values = group.map(c => c.v1);
                     const v2Values = group.map(c => c.v2);
                     
-                    const meanV1 = v1Values.reduce((sum, val) => sum + val, 0) / 4;
-                    const meanV2 = v2Values.reduce((sum, val) => sum + val, 0) / 4;
+                    const meanV1 = v1Values.reduce((sum, val) => sum + val, 0) / this.containersPerGroup;
+                    const meanV2 = v2Values.reduce((sum, val) => sum + val, 0) / this.containersPerGroup;
                     
-                    const varianceV1 = v1Values.reduce((sum, val) => sum + Math.pow(val - meanV1, 2), 0) / 4;
-                    const varianceV2 = v2Values.reduce((sum, val) => sum + Math.pow(val - meanV2, 2), 0) / 4;
+                    const varianceV1 = v1Values.reduce((sum, val) => sum + Math.pow(val - meanV1, 2), 0) / this.containersPerGroup;
+                    const varianceV2 = v2Values.reduce((sum, val) => sum + Math.pow(val - meanV2, 2), 0) / this.containersPerGroup;
                     
                     const deviationV1 = Math.abs(meanV1 - this.targetV1);
                     const deviationV2 = Math.abs(meanV2 - this.targetV2);
@@ -1239,16 +1247,16 @@
                             usedContainers.add(container.id);
                         }
                     });
-                    if (group.length === 4) {
+                    if (group.length === this.containersPerGroup) {
                         child.groups.push(group);
                     }
                 }
                 
                 const remainingContainers = allContainers.filter(c => !usedContainers.has(c.id));
                 
-                while (child.groups.length < this.numGroups && remainingContainers.length >= 4) {
+                while (child.groups.length < this.numGroups && remainingContainers.length >= this.containersPerGroup) {
                     const group = [];
-                    for (let i = 0; i < 4; i++) {
+                    for (let i = 0; i < this.containersPerGroup; i++) {
                         const randomIndex = Math.floor(Math.random() * remainingContainers.length);
                         group.push(remainingContainers.splice(randomIndex, 1)[0]);
                     }
@@ -1270,8 +1278,8 @@
                     const group2Index = Math.floor(Math.random() * this.numGroups);
                     
                     if (group1Index !== group2Index) {
-                        const container1Index = Math.floor(Math.random() * 4);
-                        const container2Index = Math.floor(Math.random() * 4);
+                        const container1Index = Math.floor(Math.random() * this.containersPerGroup);
+                        const container2Index = Math.floor(Math.random() * this.containersPerGroup);
                         
                         const temp = individual.groups[group1Index][container1Index];
                         individual.groups[group1Index][container1Index] = individual.groups[group2Index][container2Index];
@@ -1344,11 +1352,11 @@
                     const v1Values = group.map(c => c.v1);
                     const v2Values = group.map(c => c.v2);
                     
-                    const meanV1 = v1Values.reduce((sum, val) => sum + val, 0) / 4;
-                    const meanV2 = v2Values.reduce((sum, val) => sum + val, 0) / 4;
+                    const meanV1 = v1Values.reduce((sum, val) => sum + val, 0) / this.containersPerGroup;
+                    const meanV2 = v2Values.reduce((sum, val) => sum + val, 0) / this.containersPerGroup;
                     
-                    const varianceV1 = v1Values.reduce((sum, val) => sum + Math.pow(val - meanV1, 2), 0) / 4;
-                    const varianceV2 = v2Values.reduce((sum, val) => sum + Math.pow(val - meanV2, 2), 0) / 4;
+                    const varianceV1 = v1Values.reduce((sum, val) => sum + Math.pow(val - meanV1, 2), 0) / this.containersPerGroup;
+                    const varianceV2 = v2Values.reduce((sum, val) => sum + Math.pow(val - meanV2, 2), 0) / this.containersPerGroup;
                     
                     const deviationV1 = Math.abs(meanV1 - this.targetV1);
                     const deviationV2 = Math.abs(meanV2 - this.targetV2);
@@ -1470,7 +1478,7 @@
                 $('#diversityIndex').text('0.00');
                 $('#optimizeBtn').prop('disabled', true);
                 $('#generateBtn').show(); // Réafficher le bouton générer lors du reset
-                $('#fileStatus').text('Format attendu: id,v1,v2 (en-têtes obligatoires) - Nombre de containers multiple de 4 recommandé').css('color', 'white');
+                $('#fileStatus').text('Format attendu: id,v1,v2 (en-têtes obligatoires) - Nombre de containers multiple du nombre choisi par groupe recommandé').css('color', 'white');
                 this.showAllContainers = false;
             }
 
