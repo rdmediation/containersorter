@@ -568,7 +568,7 @@
         <h3>🎯 Définir les Objectifs d'Optimisation</h3>
         <div class="input-group">
             <label for="targetV1">V1 Cible</label>
-            <input type="number" id="targetV1" class="input-field" value="50.0" step="0.1" min="45" max="55">
+            <input type="number" id="targetV1" class="input-field" value="50.0" step="0.1">
         </div>
         <div class="input-group">
             <label for="toleranceV1">Tolérance V1 (±)</label>
@@ -576,7 +576,7 @@
         </div>
         <div class="input-group">
             <label for="targetV2">V2 Cible</label>
-            <input type="number" id="targetV2" class="input-field" value="25.0" step="0.1" min="20" max="30">
+            <input type="number" id="targetV2" class="input-field" value="25.0" step="0.1">
         </div>
         <div class="input-group">
             <label for="toleranceV2">Tolérance V2 (±)</label>
@@ -1068,14 +1068,6 @@
             }
 
             validateParameters() {
-                if (this.targetV1 < 45 || this.targetV1 > 55) {
-                    alert('V1 cible doit être entre 45 et 55!');
-                    return false;
-                }
-                if (this.targetV2 < 20 || this.targetV2 > 30) {
-                    alert('V2 cible doit être entre 20 et 30!');
-                    return false;
-                }
                 if (this.toleranceV1 < 0.1 || this.toleranceV1 > 10) {
                     alert('Tolérance V1 doit être entre 0.1 et 10!');
                     return false;
@@ -1372,15 +1364,15 @@
                             <div class="container-ids">IDs: [${containerIds}]</div>
                             <div class="group-containers"></div>
                             <div class="group-stats">
-                                <div><strong>V1:</strong> Moy. ${meanV1.toFixed(2)} | Var. ${varianceV1.toFixed(2)}</div>
-                                <div><strong>V2:</strong> Moy. ${meanV2.toFixed(2)} | Var. ${varianceV2.toFixed(2)}</div>
+                                <div><strong>V1:</strong> Moy. ${meanV1.toFixed(1)} | Var. ${varianceV1.toFixed(1)}</div>
+                                <div><strong>V2:</strong> Moy. ${meanV2.toFixed(1)} | Var. ${varianceV2.toFixed(1)}</div>
                                 ${v1Conforming ? 
                                     '<div style="color: #4CAF50; font-weight: bold;">✅ V1 Conforme</div>' : 
-                                    `<div style="color: #ff6b6b; font-weight: bold;">❌ V1 Écart: ${deviationV1.toFixed(2)}</div>`
+                                    `<div style="color: #ff6b6b; font-weight: bold;">❌ V1 Écart: ${deviationV1.toFixed(1)}</div>`
                                 }
                                 ${v2Conforming ? 
                                     '<div style="color: #4CAF50; font-weight: bold;">✅ V2 Conforme</div>' : 
-                                    `<div style="color: #ff6b6b; font-weight: bold;">❌ V2 Écart: ${deviationV2.toFixed(2)}</div>`
+                                    `<div style="color: #ff6b6b; font-weight: bold;">❌ V2 Écart: ${deviationV2.toFixed(1)}</div>`
                                 }
                             </div>
                         </div>
@@ -1405,28 +1397,28 @@
                             ">
                                 <div class="cube" style="width: 60px; height: 60px;">
                                     <div class="cube-face small front" style="background: linear-gradient(135deg, hsl(${hue1}, 70%, ${lightness}%), hsl(${hue2}, 60%, ${lightness - 5}%));">
-                                        <div>V1: ${container.v1}</div>
-                                        <div>V2: ${container.v2}</div>
+                                        <div>V1: ${container.v1.toFixed(1)}</div>
+                                        <div>V2: ${container.v2.toFixed(1)}</div>
                                     </div>
                                     <div class="cube-face small back" style="background: linear-gradient(135deg, hsl(${hue1}, 60%, ${lightness - 10}%), hsl(${hue2}, 50%, ${lightness - 15}%));">
-                                        <div>V1: ${container.v1}</div>
-                                        <div>V2: ${container.v2}</div>
+                                        <div>V1: ${container.v1.toFixed(1)}</div>
+                                        <div>V2: ${container.v2.toFixed(1)}</div>
                                     </div>
                                     <div class="cube-face small right" style="background: linear-gradient(135deg, hsl(${hue1}, 65%, ${lightness - 5}%), hsl(${hue2}, 55%, ${lightness - 10}%));">
-                                        <div>V1: ${container.v1}</div>
-                                        <div>V2: ${container.v2}</div>
+                                        <div>V1: ${container.v1.toFixed(1)}</div>
+                                        <div>V2: ${container.v2.toFixed(1)}</div>
                                     </div>
                                     <div class="cube-face small left" style="background: linear-gradient(135deg, hsl(${hue1}, 65%, ${lightness - 5}%), hsl(${hue2}, 55%, ${lightness - 10}%));">
-                                        <div>V1: ${container.v1}</div>
-                                        <div>V2: ${container.v2}</div>
+                                        <div>V1: ${container.v1.toFixed(1)}</div>
+                                        <div>V2: ${container.v2.toFixed(1)}</div>
                                     </div>
                                     <div class="cube-face small top" style="background: linear-gradient(135deg, hsl(${hue1}, 75%, ${lightness + 5}%), hsl(${hue2}, 65%, ${lightness}%));">
-                                        <div>V1: ${container.v1}</div>
-                                        <div>V2: ${container.v2}</div>
+                                        <div>V1: ${container.v1.toFixed(1)}</div>
+                                        <div>V2: ${container.v2.toFixed(1)}</div>
                                     </div>
                                     <div class="cube-face small bottom" style="background: linear-gradient(135deg, hsl(${hue1}, 55%, ${lightness - 15}%), hsl(${hue2}, 45%, ${lightness - 20}%));">
-                                        <div>V1: ${container.v1}</div>
-                                        <div>V2: ${container.v2}</div>
+                                        <div>V1: ${container.v1.toFixed(1)}</div>
+                                        <div>V2: ${container.v2.toFixed(1)}</div>
                                     </div>
                                 </div>
                             </div>
