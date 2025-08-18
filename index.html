@@ -307,7 +307,7 @@
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: 0.7rem;
+            font-size: 0.1rem;
             color: white;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
             border: 2px solid rgba(255, 255, 255, 0.3);
@@ -465,7 +465,7 @@
         .cube-face.small {
             width: 60px;
             height: 60px;
-            font-size: 0.65rem;
+            font-size: 0.08rem;
         }
 
         .cube-face.small.front {
@@ -627,6 +627,10 @@
         <div class="file-input-wrapper">
             <input type="file" id="csvFile" class="file-input" accept=".csv" />
             <label for="csvFile" class="file-input-label">📂 Charger CSV</label>
+        </div>
+        <div class="input-group" style="margin: 10px 0;">
+            <label for="maxRows">Max Lignes à Charger</label>
+            <input type="number" id="maxRows" class="input-field" value="200" step="1" min="10" max="10000">
         </div>
         <button class="btn" id="downloadCsvBtn">💾 Télécharger CSV Exemple</button>
         <button class="btn" id="generateBtn">🎲 Générer Containers</button>
@@ -809,8 +813,10 @@
 
                 const containers = [];
                 const errors = [];
+                const maxRows = parseInt($('#maxRows').val()) || 200;
+                const maxLines = Math.min(lines.length, maxRows + 1); // +1 pour inclure les en-têtes
 
-                for (let i = 1; i < lines.length; i++) {
+                for (let i = 1; i < maxLines; i++) {
                     const values = lines[i].split(',').map(v => v.trim());
                     
                     if (values.length !== headers.length) {
@@ -850,9 +856,13 @@
                 if (remainder !== 0) {
                     // Retirer les containers en trop pour avoir un nombre divisible par containersPerGroup
                     this.containers = containers.slice(0, containers.length - remainder);
-                    $('#fileStatus').text(`✅ ${containers.length} containers chargés (${this.containers.length} utilisés, ${remainder} ignorés pour avoir des groupes complets)`).css('color', '#ff9800');
+                    const totalInFile = lines.length - 1; // -1 pour exclure l'en-tête
+                    const loadedMsg = containers.length < totalInFile ? ` (${containers.length}/${totalInFile} chargés selon limite)` : '';
+                    $('#fileStatus').text(`✅ ${containers.length} containers${loadedMsg} (${this.containers.length} utilisés, ${remainder} ignorés pour groupes complets)`).css('color', '#ff9800');
                 } else {
-                    $('#fileStatus').text(`✅ ${containers.length} containers chargés parfaitement`).css('color', '#4CAF50');
+                    const totalInFile = lines.length - 1; // -1 pour exclure l'en-tête
+                    const loadedMsg = containers.length < totalInFile ? ` (${containers.length}/${totalInFile} chargés selon limite)` : '';
+                    $('#fileStatus').text(`✅ ${containers.length} containers${loadedMsg} chargés parfaitement`).css('color', '#4CAF50');
                 }
                 
                 this.updateGroupCount();
@@ -961,8 +971,16 @@
                 const containersToShow = this.containers.slice(0, maxDisplay);
 
                 containersToShow.forEach((container, index) => {
-                    const v1Normalized = (container.v1 - 45) / 10;
-                    const v2Normalized = (container.v2 - 20) / 10;
+                    // Calculer les min/max pour normaliser les couleurs
+                    const allV1 = this.containers.map(c => c.v1);
+                    const allV2 = this.containers.map(c => c.v2);
+                    const minV1 = Math.min(...allV1);
+                    const maxV1 = Math.max(...allV1);
+                    const minV2 = Math.min(...allV2);
+                    const maxV2 = Math.max(...allV2);
+                    
+                    const v1Normalized = (container.v1 - minV1) / (maxV1 - minV1) || 0;
+                    const v2Normalized = (container.v2 - minV2) / (maxV2 - minV2) || 0;
                     
                     const hue1 = 240 - (v1Normalized * 120);
                     const hue2 = 120 - (v2Normalized * 120);
@@ -972,28 +990,28 @@
                         <div class="container fade-in" style="animation-delay: ${Math.random() * 6}s;">
                             <div class="cube">
                                 <div class="cube-face front" style="background: linear-gradient(135deg, hsl(${hue1}, 70%, ${lightness}%), hsl(${hue2}, 60%, ${lightness - 5}%));">
-                                    <div>V1: ${container.v1}</div>
-                                    <div>V2: ${container.v2}</div>
+                                    <div>V1: ${container.v1.toFixed(1)}</div>
+                                    <div>V2: ${container.v2.toFixed(1)}</div>
                                 </div>
                                 <div class="cube-face back" style="background: linear-gradient(135deg, hsl(${hue1}, 60%, ${lightness - 10}%), hsl(${hue2}, 50%, ${lightness - 15}%));">
-                                    <div>V1: ${container.v1}</div>
-                                    <div>V2: ${container.v2}</div>
+                                    <div>V1: ${container.v1.toFixed(1)}</div>
+                                    <div>V2: ${container.v2.toFixed(1)}</div>
                                 </div>
                                 <div class="cube-face right" style="background: linear-gradient(135deg, hsl(${hue1}, 65%, ${lightness - 5}%), hsl(${hue2}, 55%, ${lightness - 10}%));">
-                                    <div>V1: ${container.v1}</div>
-                                    <div>V2: ${container.v2}</div>
+                                    <div>V1: ${container.v1.toFixed(1)}</div>
+                                    <div>V2: ${container.v2.toFixed(1)}</div>
                                 </div>
                                 <div class="cube-face left" style="background: linear-gradient(135deg, hsl(${hue1}, 65%, ${lightness - 5}%), hsl(${hue2}, 55%, ${lightness - 10}%));">
-                                    <div>V1: ${container.v1}</div>
-                                    <div>V2: ${container.v2}</div>
+                                    <div>V1: ${container.v1.toFixed(1)}</div>
+                                    <div>V2: ${container.v2.toFixed(1)}</div>
                                 </div>
                                 <div class="cube-face top" style="background: linear-gradient(135deg, hsl(${hue1}, 75%, ${lightness + 5}%), hsl(${hue2}, 65%, ${lightness}%));">
-                                    <div>V1: ${container.v1}</div>
-                                    <div>V2: ${container.v2}</div>
+                                    <div>V1: ${container.v1.toFixed(1)}</div>
+                                    <div>V2: ${container.v2.toFixed(1)}</div>
                                 </div>
                                 <div class="cube-face bottom" style="background: linear-gradient(135deg, hsl(${hue1}, 55%, ${lightness - 15}%), hsl(${hue2}, 45%, ${lightness - 20}%));">
-                                    <div>V1: ${container.v1}</div>
-                                    <div>V2: ${container.v2}</div>
+                                    <div>V1: ${container.v1.toFixed(1)}</div>
+                                    <div>V2: ${container.v2.toFixed(1)}</div>
                                 </div>
                             </div>
                         </div>
@@ -1388,8 +1406,17 @@
 
                     const containersDiv = groupDiv.find('.group-containers');
                     group.forEach((container, containerIndex) => {
-                        const v1Normalized = (container.v1 - 45) / 10;
-                        const v2Normalized = (container.v2 - 20) / 10;
+                        // Calculer les min/max pour normaliser les couleurs
+                        const allContainers = this.bestSolution.groups.flat();
+                        const allV1 = allContainers.map(c => c.v1);
+                        const allV2 = allContainers.map(c => c.v2);
+                        const minV1 = Math.min(...allV1);
+                        const maxV1 = Math.max(...allV1);
+                        const minV2 = Math.min(...allV2);
+                        const maxV2 = Math.max(...allV2);
+                        
+                        const v1Normalized = (container.v1 - minV1) / (maxV1 - minV1) || 0;
+                        const v2Normalized = (container.v2 - minV2) / (maxV2 - minV2) || 0;
                         
                         const hue1 = 240 - (v1Normalized * 120);
                         const hue2 = 120 - (v2Normalized * 120);
