@@ -1060,6 +1060,8 @@
                     return;
                 }
 
+                console.log(`Début optimisation: ${this.containers.length} containers, ${this.numGroups} groupes de ${this.containersPerGroup}`);
+                
                 this.isOptimizing = true;
                 $('#optimizeBtn').prop('disabled', true);
                 $('#loading').show();
@@ -1067,18 +1069,29 @@
 
                 this.generation = 0;
                 this.fitnessHistory = [];
+                
+                console.log('Initialisation de la population...');
+                await this.sleep(10); // Laisser l'UI se mettre à jour
                 this.initializePopulation();
+                console.log('Population initialisée');
 
                 for (let gen = 0; gen < this.maxGenerations && this.isOptimizing; gen++) {
+                    if (gen % 50 === 0) {
+                        console.log(`Génération ${gen}, fitness: ${this.bestSolution.fitness}`);
+                    }
+                    
                     await this.evolveGeneration();
                     this.updateStats();
                     this.updateProgress(gen / this.maxGenerations);
                     
-                    if (gen % 10 === 0) {
-                        await this.sleep(50);
+                    // Réduire la fréquence des pauses pour gros datasets
+                    const sleepInterval = this.containers.length > 500 ? 50 : 10;
+                    if (gen % sleepInterval === 0) {
+                        await this.sleep(this.containers.length > 500 ? 10 : 50);
                     }
                     
                     if (this.shouldStop()) {
+                        console.log(`Convergence atteinte à la génération ${gen}`);
                         break;
                     }
                 }
@@ -1094,13 +1107,35 @@
                 this.toleranceV1 = parseFloat($('#toleranceV1').val());
                 this.targetV2 = parseFloat($('#targetV2').val());
                 this.toleranceV2 = parseFloat($('#toleranceV2').val());
+                
+                // Mettre à jour containersPerGroup et recalculer numGroups
+                const oldContainersPerGroup = this.containersPerGroup;
                 this.containersPerGroup = parseInt($('#containersPerGroup').val());
+                if (oldContainersPerGroup !== this.containersPerGroup) {
+                    this.updateGroupCount();
+                    console.log(`Containers par groupe changé: ${oldContainersPerGroup} → ${this.containersPerGroup}, nouveaux groupes: ${this.numGroups}`);
+                }
+                
                 this.populationSize = parseInt($('#populationSize').val());
                 this.mutationRate = parseFloat($('#mutationRate').val()) / 100;
                 this.maxGenerations = parseInt($('#maxGenerations').val());
                 this.elitismRate = parseFloat($('#elitismRate').val()) / 100;
                 this.tournamentSize = parseInt($('#tournamentSize').val());
                 this.crossoverRate = parseFloat($('#crossoverRate').val()) / 100;
+                
+                // Ajustements automatiques pour gros datasets
+                if (this.containers.length > 500) {
+                    this.populationSize = Math.min(50, this.populationSize); // Réduire drastiquement la population
+                    this.maxGenerations = Math.max(1000, this.maxGenerations); // Augmenter les générations
+                    this.mutationRate = Math.max(0.25, this.mutationRate); // Augmenter la mutation
+                    console.log(`Ajustement automatique: population=${this.populationSize}, générations=${this.maxGenerations}`);
+                }
+                
+                if (this.containersPerGroup > 20) {
+                    this.elitismRate = Math.min(0.02, this.elitismRate); // Réduire drastiquement l'élitisme
+                    this.tournamentSize = Math.min(2, this.tournamentSize); // Réduire le tournoi
+                    console.log(`Ajustement pour gros groupes: élitisme=${this.elitismRate}, tournoi=${this.tournamentSize}`);
+                }
             }
 
             validateParameters() {
@@ -1112,43 +1147,90 @@
                     alert('Tolérance V2 doit être entre 0.1 et 5!');
                     return false;
                 }
+                
+                // Validation pour éviter les blocages
+                const totalContainers = this.containers.length;
+                this.updateGroupCount(); // S'assurer que numGroups est à jour
+                const usableContainers = this.numGroups * this.containersPerGroup;
+                
+                console.log(`Debug validation: containers=${totalContainers}, numGroups=${this.numGroups}, containersPerGroup=${this.containersPerGroup}, nécessaire=${usableContainers}`);
+                
+                if (totalContainers < usableContainers) {
+                    alert(`Pas assez de containers! Nécessaire: ${usableContainers}, disponibles: ${totalContainers}`);
+                    return false;
+                }
+                
+                // Avertissement pour les gros datasets
+                if (totalContainers > 1000 && this.containersPerGroup > 50) {
+                    const proceed = confirm(`Configuration complexe: ${totalContainers} containers en groupes de ${this.containersPerGroup}. Cela peut prendre du temps. Continuer?`);
+                    if (!proceed) return false;
+                }
+                
                 return true;
             }
 
             shouldStop() {
-                if (this.fitnessHistory.length < 50) return false;
+                if (this.fitnessHistory.length < 30) return false;
                 
-                const recent = this.fitnessHistory.slice(-50);
+                const recent = this.fitnessHistory.slice(-30);
                 const improvement = recent[recent.length - 1] - recent[0];
                 
+                // Critères de convergence adaptés aux gros datasets
+                const avgFitness = recent.reduce((a, b) => a + b, 0) / recent.length;
+                const relativePerturbation = improvement / avgFitness;
+                
+                // Arrêt si amélioration relative très faible
+                if (Math.abs(relativePerturbation) < 0.001) return true;
+                
+                // Arrêt si amélioration absolue très faible
                 return improvement < 0.01;
             }
 
             initializePopulation() {
                 this.population = [];
+                console.log(`Création de ${this.populationSize} individus...`);
+                
                 for (let i = 0; i < this.populationSize; i++) {
+                    if (i % 10 === 0) {
+                        console.log(`Individu ${i}/${this.populationSize}`);
+                    }
                     const individual = this.createRandomIndividual();
                     individual.fitness = this.calculateFitness(individual);
                     this.population.push(individual);
                 }
+                
+                console.log('Tri de la population...');
                 this.population.sort((a, b) => b.fitness - a.fitness);
                 this.bestSolution = { ...this.population[0] };
+                console.log(`Meilleur fitness initial: ${this.bestSolution.fitness}`);
             }
 
             createRandomIndividual() {
                 const groups = [];
                 const containersCopy = [...this.containers];
                 
+                // Optimisation: mélanger une seule fois puis découper
+                this.shuffleArray(containersCopy);
+                
                 for (let i = 0; i < this.numGroups; i++) {
                     const group = [];
+                    const startIndex = i * this.containersPerGroup;
                     for (let j = 0; j < this.containersPerGroup; j++) {
-                        const randomIndex = Math.floor(Math.random() * containersCopy.length);
-                        group.push(containersCopy.splice(randomIndex, 1)[0]);
+                        if (startIndex + j < containersCopy.length) {
+                            group.push(containersCopy[startIndex + j]);
+                        }
                     }
                     groups.push(group);
                 }
                 
                 return { groups };
+            }
+
+            shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
             }
 
             calculateFitness(individual) {
@@ -1259,38 +1341,50 @@
             }
 
             crossover(parent1, parent2) {
+                // Optimisation: croisement plus efficace pour gros datasets
+                const child = { groups: [] };
                 const allContainers = [];
                 parent1.groups.forEach(group => allContainers.push(...group));
                 
-                const child = { groups: [] };
+                // Croisement uniforme plus simple
+                const crossoverMask = [];
+                for (let i = 0; i < this.numGroups; i++) {
+                    crossoverMask.push(Math.random() < 0.5);
+                }
+                
                 const usedContainers = new Set();
                 
-                const crossoverPoint = Math.floor(Math.random() * this.numGroups);
-                
-                for (let i = 0; i < crossoverPoint; i++) {
-                    const group = [];
-                    parent1.groups[i].forEach(container => {
-                        if (!usedContainers.has(container.id)) {
-                            group.push(container);
-                            usedContainers.add(container.id);
+                // Prendre les groupes complets selon le masque
+                for (let i = 0; i < this.numGroups; i++) {
+                    if (crossoverMask[i] && parent1.groups[i].length === this.containersPerGroup) {
+                        const validGroup = parent1.groups[i].filter(c => !usedContainers.has(c.id));
+                        if (validGroup.length === this.containersPerGroup) {
+                            child.groups.push([...validGroup]);
+                            validGroup.forEach(c => usedContainers.add(c.id));
                         }
-                    });
-                    if (group.length === this.containersPerGroup) {
-                        child.groups.push(group);
+                    } else if (!crossoverMask[i] && parent2.groups[i].length === this.containersPerGroup) {
+                        const validGroup = parent2.groups[i].filter(c => !usedContainers.has(c.id));
+                        if (validGroup.length === this.containersPerGroup) {
+                            child.groups.push([...validGroup]);
+                            validGroup.forEach(c => usedContainers.add(c.id));
+                        }
                     }
                 }
                 
+                // Compléter avec les containers restants
                 const remainingContainers = allContainers.filter(c => !usedContainers.has(c.id));
+                this.shuffleArray(remainingContainers);
                 
-                while (child.groups.length < this.numGroups && remainingContainers.length >= this.containersPerGroup) {
+                let containerIndex = 0;
+                while (child.groups.length < this.numGroups && containerIndex + this.containersPerGroup <= remainingContainers.length) {
                     const group = [];
                     for (let i = 0; i < this.containersPerGroup; i++) {
-                        const randomIndex = Math.floor(Math.random() * remainingContainers.length);
-                        group.push(remainingContainers.splice(randomIndex, 1)[0]);
+                        group.push(remainingContainers[containerIndex++]);
                     }
                     child.groups.push(group);
                 }
                 
+                // Si pas assez de groupes, compléter avec des groupes aléatoires
                 while (child.groups.length < this.numGroups) {
                     child.groups.push(this.createRandomIndividual().groups[0]);
                 }
